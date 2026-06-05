@@ -1,20 +1,21 @@
 # Fraud Detection Case Study
 
-A professional machine learning case study for detecting fraudulent financial transactions using Python.  
-The project covers data cleaning, exploratory data analysis, feature engineering, class imbalance handling, model training, model evaluation, and business-focused recommendations.
+A professional machine learning case study for detecting fraudulent financial transactions using Python and scikit-learn.
+
+This project follows an end-to-end workflow: data loading, data cleaning, exploratory data analysis, feature engineering, leakage-safe train/test preparation, class imbalance handling with SMOTE-NC, model training, model evaluation, feature importance analysis, and business recommendations.
 
 ---
 
-## Project Overview
+## Project Objective
 
-Fraud detection is a high-impact classification problem where the goal is not only to achieve high accuracy, but also to correctly identify rare fraudulent transactions while keeping false alerts manageable.
+The objective of this project is to build a machine learning model that can classify financial transactions as either:
 
-This project builds and evaluates machine learning models to classify transactions as:
+| Class | Meaning |
+|---|---|
+| `0` | Legitimate transaction |
+| `1` | Fraudulent transaction |
 
-- `0` — Legitimate transaction
-- `1` — Fraudulent transaction
-
-The final recommended model is **Random Forest**, selected because it provides stronger fraud detection performance and a better balance between precision, recall, and PR-AUC compared with the baseline Logistic Regression model.
+Fraud detection is an imbalanced classification problem. In this dataset, fraud transactions are rare, so accuracy alone is not enough. The project focuses on fraud-relevant metrics such as precision, recall, F1-score, ROC-AUC, and PR-AUC.
 
 ---
 
@@ -23,17 +24,22 @@ The final recommended model is **Random Forest**, selected because it provides s
 ```text
 fraud-detection-case-study/
 │
-├── fraud.ipynb          # Main Jupyter Notebook
-├── fraud.csv            # Transaction dataset 
-└── README.md            # Project documentation
+├── fraud.ipynb      # Main Jupyter Notebook
+├── fraud.csv        # Transaction dataset required by the notebook
+└── README.md        # Project documentation
 ```
 
-> Note: The notebook uses `DATA_PATH = "fraud.csv"`.  
-> If your dataset has a different file name, rename it to `fraud.csv` or update the `DATA_PATH` variable in the notebook.
+> Important: The notebook uses:
+>
+> ```python
+> DATA_PATH = "fraud.csv"
+> ```
+>
+> Therefore, the dataset file must be named `fraud.csv` and placed in the same folder as `fraud.ipynb`.
 
 ---
 
-## Dataset Summary
+## Dataset Overview
 
 The dataset contains **594,643 transactions** and **10 original columns**.
 
@@ -50,43 +56,65 @@ The dataset contains **594,643 transactions** and **10 original columns**.
 | `zipMerchant` | Merchant ZIP code |
 | `category` | Transaction category |
 | `amount` | Transaction amount |
-| `fraud` | Target variable: `0` legitimate, `1` fraud |
+| `fraud` | Target variable |
 
-### Class Distribution
+### Target Distribution
 
 | Class | Count | Percentage |
 |---|---:|---:|
-| Legitimate | 587,443 | 98.79% |
-| Fraud | 7,200 | 1.21% |
+| Legitimate transactions | 587,443 | 98.79% |
+| Fraudulent transactions | 7,200 | 1.21% |
 
-The dataset is highly imbalanced, with approximately an **82:1 ratio** of legitimate to fraudulent transactions. Because of this imbalance, accuracy alone is not a reliable evaluation metric.
-
----
-
-## Key Objectives
-
-The main objectives of this case study are to:
-
-1. Understand the dataset and detect data quality issues.
-2. Explore fraud patterns across transaction amount, category, merchant, age, gender, and time.
-3. Engineer meaningful predictive features.
-4. Handle severe class imbalance using SMOTE-NC.
-5. Train and compare machine learning models.
-6. Evaluate models using fraud-relevant metrics.
-7. Recommend a practical model for fraud detection use cases.
+The dataset is highly imbalanced. A naive model that predicts every transaction as legitimate would achieve **98.79% accuracy**, but it would miss every fraud case. For this reason, the project uses fraud-focused evaluation metrics.
 
 ---
 
-## Methodology
+## Workflow Summary
 
-### 1. Data Preprocessing
+### 1. Data Loading and Cleaning
 
-The preprocessing stage includes:
+The notebook loads the dataset using pandas and performs initial cleaning steps, including:
 
-- Loading the transaction dataset.
+- Loading `fraud.csv`.
 - Removing quote artifacts from categorical columns.
+- Checking data types.
 - Checking missing values.
-- Reviewing data types.
+- Reviewing dataset shape and memory usage.
+
+The following categorical columns are cleaned by removing surrounding quote characters:
+
+```python
+customer, age, gender, zipcodeOri, merchant, zipMerchant, category
+```
+
+---
+
+### 2. Exploratory Data Analysis
+
+The analysis explores fraud behavior across several areas:
+
+- Class imbalance.
+- Transaction amount distribution.
+- Fraud rate by transaction category.
+- Fraud patterns by hour and day.
+- Fraud rate by gender and age.
+- Merchant-level fraud behavior.
+- Customer-level transaction behavior.
+
+Key findings from the notebook:
+
+- Fraudulent transactions are rare but have much higher average transaction amounts.
+- Transaction amount is a strong fraud signal.
+- Merchant behavior is highly predictive of fraud risk.
+- Category-level fraud rates provide useful risk information.
+- The dataset covers steps from `0` to `179`, approximately **7.5 days**.
+
+---
+
+### 3. Preprocessing
+
+The notebook prepares the dataset by:
+
 - Dropping zero-variance columns:
   - `zipcodeOri`
   - `zipMerchant`
@@ -94,71 +122,68 @@ The preprocessing stage includes:
   - `age`
   - `gender`
   - `category`
+- Creating encoded columns:
+  - `age_enc`
+  - `gender_enc`
+  - `category_enc`
+
+The zero-variance columns are removed because both contain only one unique value and do not add predictive value.
 
 ---
 
-### 2. Exploratory Data Analysis
+### 4. Feature Engineering
 
-The EDA focuses on understanding fraud behavior across:
+The final modeling dataset contains **15 features**.
 
-- Target class imbalance
-- Transaction amount distribution
-- Fraud rate by transaction category
-- Fraud rate by time patterns
-- Fraud rate by age group and gender
-- Merchant-level and customer-level patterns
+### Feature Groups
 
-Important insights include:
+| Feature Group | Features |
+|---|---|
+| Raw numeric | `step` |
+| Encoded categorical | `age_enc`, `gender_enc`, `category_enc` |
+| Temporal | `hour_of_day`, `day_of_week`, `is_night` |
+| Amount-based | `amount`, `log_amount` |
+| Customer behavior | `cust_tx_count`, `cust_avg_amount`, `cust_max_amount` |
+| Merchant and category risk | `merch_fraud_rate`, `merch_tx_count`, `cat_fraud_rate` |
 
-- Fraudulent transactions are rare but financially significant.
-- Transaction amount is a strong signal.
-- Merchant and category risk are highly informative.
-- Fraud patterns vary by time and transaction category.
+### Leakage-Safe Aggregation
+
+The notebook creates historical aggregate features such as:
+
+- `merch_fraud_rate`
+- `cat_fraud_rate`
+- `cust_tx_count`
+- `cust_avg_amount`
+- `cust_max_amount`
+- `merch_tx_count`
+
+To reduce target leakage, aggregate mappings are calculated using the training set and then applied to both training and test sets.
 
 ---
 
-### 3. Feature Engineering
+## Train/Test Split
 
-The notebook creates several feature groups:
+The notebook uses a stratified train/test split.
 
-#### Temporal Features
+| Dataset | Rows | Fraud Rate |
+|---|---:|---:|
+| Training set | 475,714 | 1.21% |
+| Test set | 118,929 | 1.21% |
 
-| Feature | Description |
-|---|---|
-| `hour_of_day` | Hour extracted from `step` |
-| `day_of_week` | Day extracted from `step` |
-| `is_night` | Indicates whether the transaction happened at night |
+Fraud counts:
 
-#### Amount Features
-
-| Feature | Description |
-|---|---|
-| `amount` | Original transaction amount |
-| `log_amount` | Log-transformed transaction amount |
-
-#### Customer Features
-
-| Feature | Description |
-|---|---|
-| `cust_tx_count` | Number of transactions per customer |
-| `cust_avg_amount` | Average transaction amount per customer |
-| `cust_max_amount` | Maximum transaction amount per customer |
-
-#### Merchant and Category Features
-
-| Feature | Description |
-|---|---|
-| `merch_fraud_rate` | Historical fraud rate by merchant |
-| `merch_tx_count` | Number of transactions per merchant |
-| `cat_fraud_rate` | Historical fraud rate by category |
-
-To avoid target leakage, aggregate features are calculated using the training set only and then mapped to both training and test data.
+| Dataset | Fraud Count |
+|---|---:|
+| Training set | 5,760 |
+| Test set | 1,440 |
 
 ---
 
 ## Class Imbalance Handling
 
-Fraud cases represent only **1.21%** of the dataset, so the notebook applies **SMOTE-NC** only on the training set.
+Because the fraud class represents only **1.21%** of the dataset, the notebook applies **SMOTE-NC** to the training data only.
+
+SMOTE-NC is used because the feature set contains both numeric and categorical/discrete features.
 
 ### Before SMOTE-NC
 
@@ -166,6 +191,7 @@ Fraud cases represent only **1.21%** of the dataset, so the notebook applies **S
 |---|---:|---:|
 | Fraud | 5,760 | 1.21% |
 | Legitimate | 469,954 | 98.79% |
+| Total | 475,714 | 100% |
 
 ### After SMOTE-NC
 
@@ -173,52 +199,64 @@ Fraud cases represent only **1.21%** of the dataset, so the notebook applies **S
 |---|---:|---:|
 | Fraud | 46,995 | 9.09% |
 | Legitimate | 469,954 | 90.91% |
+| Total | 516,949 | 100% |
 
-The test set is not resampled, which keeps evaluation realistic.
+The test set is not resampled, which keeps the evaluation realistic.
 
 ---
 
 ## Models Trained
 
-Two models are trained and compared:
+The notebook trains and compares two models.
 
-1. **Logistic Regression**
-   - Used as a simple baseline model.
-   - Requires feature scaling.
+### 1. Random Forest
 
-2. **Random Forest**
-   - Used as the primary model.
-   - Handles non-linear relationships well.
-   - Provides feature importance for interpretation.
+The primary model is a Random Forest trained on the SMOTE-NC resampled training set.
+
+Main configuration:
+
+```python
+RandomForestClassifier(
+    n_estimators=100,
+    random_state=SEED,
+    n_jobs=-1
+)
+```
+
+### 2. Logistic Regression
+
+Logistic Regression is used as a baseline model.
+
+The notebook scales the features before training Logistic Regression using `StandardScaler`.
 
 ---
 
 ## Evaluation Metrics
 
-Because fraud detection is an imbalanced classification problem, the project focuses on:
+The project uses the following metrics:
 
-- Precision
-- Recall
-- F1-score
-- ROC-AUC
-- PR-AUC
-- Confusion Matrix
-
-PR-AUC and F1-score are especially important because they focus more directly on minority-class fraud detection performance.
+| Metric | Why It Matters |
+|---|---|
+| Precision | Measures how many predicted fraud cases were actually fraud |
+| Recall | Measures how many real fraud cases were caught |
+| F1-score | Balances precision and recall |
+| ROC-AUC | Measures overall ranking ability |
+| PR-AUC | Better suited for imbalanced fraud detection |
+| Confusion Matrix | Shows fraud caught, fraud missed, and false alerts |
 
 ---
 
 ## Model Results
 
-### Random Forest
+### Random Forest Results
 
 | Metric | Score |
 |---|---:|
 | ROC-AUC | 0.9952 |
 | PR-AUC | 0.9137 |
-| F1-score for Fraud | 0.8393 |
-| Fraud Precision | 82% |
-| Fraud Recall | 86% |
+| F1-score for fraud | 0.8393 |
+| Fraud precision | 82% |
+| Fraud recall | 86% |
 
 ### Random Forest Confusion Matrix
 
@@ -229,19 +267,19 @@ PR-AUC and F1-score are especially important because they focus more directly on
 | False Positives — false alerts | 279 |
 | True Negatives — correct approvals | 117,210 |
 
-The Random Forest model caught **86.3%** of fraudulent transactions while keeping the false alert rate at only **0.24%** of legitimate transactions.
+The Random Forest model caught **86.32%** of fraudulent transactions and produced a false alert rate of **0.24%** on legitimate transactions.
 
 ---
 
-### Logistic Regression
+### Logistic Regression Results
 
 | Metric | Score |
 |---|---:|
 | ROC-AUC | 0.9970 |
 | PR-AUC | 0.8768 |
-| F1-score for Fraud | 0.7670 |
+| F1-score for fraud | 0.7670 |
 
-Although Logistic Regression achieved a slightly higher ROC-AUC, Random Forest achieved stronger PR-AUC and F1-score, making it more suitable for the fraud detection objective.
+Logistic Regression achieved a slightly higher ROC-AUC, but it had lower PR-AUC and lower fraud F1-score than Random Forest.
 
 ---
 
@@ -252,15 +290,37 @@ Although Logistic Regression achieved a slightly higher ROC-AUC, Random Forest a
 | Random Forest | 0.9952 | 0.9137 | 0.8393 |
 | Logistic Regression | 0.9970 | 0.8768 | 0.7670 |
 
-### Final Model Recommendation
+## Final Model Recommendation
 
-**Random Forest** is recommended as the final model because it delivers better fraud-focused performance, especially in terms of PR-AUC and F1-score. These metrics are more meaningful than accuracy for imbalanced fraud detection problems.
+The recommended model is **Random Forest**.
+
+Although Logistic Regression achieved a slightly higher ROC-AUC, Random Forest performed better on the metrics that matter more for fraud detection:
+
+- Higher PR-AUC.
+- Higher fraud F1-score.
+- Strong fraud recall.
+- Manageable false alert rate.
+
+For an imbalanced fraud detection problem, PR-AUC and F1-score are more useful than accuracy alone.
 
 ---
 
-## Feature Importance Insights
+## Feature Importance Analysis
 
-The most important predictors include:
+The notebook also trains a separate Random Forest model for feature importance analysis using:
+
+```python
+RandomForestClassifier(
+    n_estimators=300,
+    random_state=42,
+    n_jobs=-1,
+    class_weight="balanced"
+)
+```
+
+This section is used for model interpretation and business insights.
+
+### Top Feature Importances
 
 | Feature | Importance |
 |---|---:|
@@ -270,34 +330,33 @@ The most important predictors include:
 | `log_amount` | 10.1% |
 | `amount` | 9.5% |
 
-### Business Interpretation
+### Interpretation
 
-The strongest signal is merchant behavior. This suggests that who the customer transacts with is highly predictive of fraud risk. Transaction category and amount also provide strong signals.
+The strongest fraud signal is merchant behavior. This means the merchant involved in the transaction is highly predictive of fraud risk. Category risk and transaction amount are also important predictors.
 
 ---
 
 ## Business Recommendations
 
-Based on the analysis and model results:
+Based on the model results and analysis:
 
-1. **Use Random Forest as the primary fraud detection model**
-   - It provides strong fraud recall while maintaining manageable false alerts.
+1. **Use Random Forest as the primary fraud detection model.**  
+   It provides the best balance between fraud detection and manageable false alerts.
 
-2. **Prioritize high-risk merchants and categories**
-   - Merchant fraud rate and category fraud rate are among the strongest predictors.
+2. **Prioritize high-risk merchants.**  
+   Merchant-level fraud rate is the strongest predictor in the notebook.
 
-3. **Monitor high-value transactions**
-   - Fraudulent transactions have higher average amounts, making amount-based monitoring important.
+3. **Monitor high-risk transaction categories.**  
+   Some categories have much higher fraud rates than others.
 
-4. **Use model probabilities for risk scoring**
-   - Instead of only predicting fraud or legitimate, use probability thresholds to create risk levels:
-     - Low risk
-     - Medium risk
-     - High risk
+4. **Use transaction amount as a risk signal.**  
+   Fraudulent transactions have a much higher average amount than legitimate transactions.
 
-5. **Tune thresholds based on business cost**
-   - If missing fraud is very expensive, lower the threshold to increase recall.
-   - If manual review capacity is limited, raise the threshold to improve precision.
+5. **Use probability scores instead of only hard predictions.**  
+   Model probabilities can support risk levels such as low, medium, and high risk.
+
+6. **Tune the decision threshold based on business needs.**  
+   Lower thresholds increase fraud recall, while higher thresholds reduce false alerts.
 
 ---
 
@@ -310,47 +369,31 @@ git clone https://github.com/your-username/fraud-detection-case-study.git
 cd fraud-detection-case-study
 ```
 
-### 2. Create a Virtual Environment
+Replace `your-username` with your GitHub username.
 
-```bash
-python -m venv venv
-```
-
-Activate it:
-
-```bash
-# Windows
-venv\Scripts\activate
-```
-
-```bash
-# macOS/Linux
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-If you do not have a `requirements.txt` file yet, install the main packages manually:
+### 2. Install Required Packages
 
 ```bash
 pip install pandas numpy matplotlib seaborn scikit-learn imbalanced-learn joblib jupyter
 ```
 
-### 4. Open the Notebook
+### 3. Open the Notebook
 
 ```bash
 jupyter notebook fraud.ipynb
 ```
 
-Then run the cells from top to bottom.
+### 4. Run the Notebook
+
+Run all cells from top to bottom.
+
+Make sure that `fraud.csv` is in the same folder as `fraud.ipynb`.
 
 ---
 
-## Suggested `requirements`
+## Requirements
+
+The notebook uses the following Python libraries:
 
 ```text
 pandas
@@ -367,31 +410,32 @@ jupyter
 
 ## Limitations
 
-This project provides a strong analytical and modeling workflow, but several limitations should be considered:
+This project is suitable as a case study and analytical prototype. Before production use, the following points should be considered:
 
-- The model should be validated on newer unseen data before production use.
-- Threshold tuning should be aligned with business cost and review capacity.
-- Merchant and category fraud rates should be recalculated carefully over time to avoid leakage.
-- Additional production monitoring would be required to detect model drift.
-- Real-world deployment would need stronger governance, explainability, and alert management.
+- Validate the model on newer unseen data.
+- Tune the classification threshold using business cost assumptions.
+- Monitor model performance over time.
+- Recalculate fraud-rate features carefully to avoid leakage.
+- Add stronger explainability for operational fraud review.
+- Build a retraining and monitoring pipeline.
 
 ---
 
 ## Future Improvements
 
-Potential improvements include:
+Potential future enhancements include:
 
 - Hyperparameter tuning for Random Forest.
-- Testing additional models such as XGBoost, LightGBM, or CatBoost.
-- Adding threshold optimization based on business cost.
-- Building a risk-score dashboard.
-- Adding model explainability using SHAP.
-- Creating an automated pipeline for retraining and monitoring.
+- Testing advanced gradient boosting models such as XGBoost, LightGBM, or CatBoost.
+- Adding SHAP-based explainability.
+- Building a fraud risk dashboard.
+- Creating an automated model training pipeline.
+- Adding threshold optimization based on fraud loss and review capacity.
 
 ---
 
 ## Final Conclusion
 
-This project demonstrates a complete fraud detection workflow from raw data to business-ready model evaluation.  
-The Random Forest model is the preferred solution because it achieves strong fraud detection performance, catches most fraudulent transactions, and keeps false alerts relatively low.
+This project demonstrates a complete fraud detection machine learning workflow. The notebook shows how to clean transaction data, analyze fraud patterns, engineer predictive features, handle class imbalance, train models, evaluate results, and translate model outputs into business recommendations.
 
+The final recommended model is **Random Forest** because it achieved the strongest fraud-focused performance, with a fraud F1-score of **0.8393**, PR-AUC of **0.9137**, and fraud recall of **86.32%**.
