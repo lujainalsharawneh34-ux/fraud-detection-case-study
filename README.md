@@ -350,7 +350,7 @@ Then run the cells from top to bottom.
 
 ---
 
-## Suggested `requirements.txt`
+## Suggested `requirements`
 
 ```text
 pandas
