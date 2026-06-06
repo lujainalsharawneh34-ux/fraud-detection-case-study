@@ -4,6 +4,7 @@ A professional machine learning case study for detecting fraudulent financial tr
 
 This project follows an end-to-end workflow: data loading, data cleaning, exploratory data analysis, feature engineering, leakage-safe train/test preparation, class imbalance handling with SMOTE-NC, model training, model evaluation, feature importance analysis, and business recommendations.
 
+
 ---
 
 ## Project Objective
